@@ -24,13 +24,9 @@ public class MainActivity extends AppCompatActivity {
         }
 
         zoomRecyclerView = (PullZoomRecyclerView) findViewById(R.id.rv);
-
-
         zoomRecyclerView.setLayoutManager(new LinearLayoutManager(this, LinearLayoutManager.VERTICAL, false));
-
         MyAdapter adapter = new MyAdapter(datas, this);
         adapter.setImageResource(R.drawable.pic);
-
         zoomRecyclerView.setAdapter(adapter);
     }
 }
