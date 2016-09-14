@@ -6,16 +6,20 @@ import android.app.Activity;
 import android.content.Context;
 import android.os.Build;
 import android.support.annotation.Nullable;
+import android.support.v7.widget.GridLayoutManager;
 import android.support.v7.widget.LinearLayoutManager;
 import android.support.v7.widget.RecyclerView;
 import android.util.AttributeSet;
 import android.util.DisplayMetrics;
+import android.util.Log;
 import android.view.MotionEvent;
 import android.view.ViewGroup;
 import android.view.animation.AccelerateDecelerateInterpolator;
 import android.view.animation.AccelerateInterpolator;
 import android.view.animation.LinearInterpolator;
 import android.widget.FrameLayout;
+
+import java.util.IllegalFormatException;
 
 /**
  * Created by DHN on 2016/8/20.
@@ -50,7 +54,6 @@ public class PullZoomRecyclerView extends RecyclerView {
     }
 
 
-
     public void setHeaderContainer(FrameLayout headerContainer) {
         mHeaderContainer = headerContainer;
     }
@@ -63,11 +66,12 @@ public class PullZoomRecyclerView extends RecyclerView {
         mScreenWidth = localDisplayMetrics.widthPixels;
         //固定的header高度
         mHeaderHeight = (int) (9.0F * (mScreenWidth / 16.0F));
+
     }
 
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     @Override
-    public boolean onTouchEvent(MotionEvent e) {
+    public boolean onTouchEvent(MotionEvent e){
         switch (e.getAction()) {
             case MotionEvent.ACTION_DOWN:
                 if (valueAnimator != null && valueAnimator.isRunning()) {
@@ -75,26 +79,37 @@ public class PullZoomRecyclerView extends RecyclerView {
                 }
                 //记录触点Y轴坐标
                 mLastMotionY = e.getY();
+                Log.e(TAG, "down-->y=" + mLastMotionY);
                 break;
             case MotionEvent.ACTION_MOVE:
                 //计算deltY
                 float Y = e.getY();
                 float deltY = Y - mLastMotionY;
-                //暂时只能LinearLayout使用,不可见时，交给RecyclerView处理
-                int firstItemPosition = ((LinearLayoutManager)getLayoutManager()).findFirstVisibleItemPosition();
-                if (firstItemPosition > 0) {
-                    return super.onTouchEvent(e);
+
+                int top  = mHeaderContainer.getTop();
+                int height = mHeaderContainer.getHeight();
+                int bottom = mHeaderContainer.getBottom();
+
+                Log.e(TAG, "h=" + mHeaderHeight + ", top=" + top + ", height=" + height + ", deltY=" + deltY);
+
+                LayoutManager manager = getLayoutManager();
+                LinearLayoutManager linearLayoutManager = null;
+                if (manager != null && manager instanceof LinearLayoutManager) {
+                    linearLayoutManager = (LinearLayoutManager) manager;
+                } else {
+                    try {
+                        throw new LayoutExcaption();
+                    } catch (LayoutExcaption layoutExcaption) {
+                        layoutExcaption.printStackTrace();
+                    }
                 }
 
-                //处于未放大状态且向上滑，则将事件交给RecyclerView处理
-                if (mHeaderContainer.getBottom() == mHeaderHeight && deltY < 0) {
-                    return super.onTouchEvent(e);
-                }
+                linearLayoutManager.findFirstVisibleItemPosition();
+                int firstPos = linearLayoutManager.findFirstVisibleItemPosition();
 
 
-
-                if (mHeaderContainer.getBottom() >= mHeaderHeight) {
-
+                //当前
+                if (top == 0 && (height > mHeaderHeight || (height == mHeaderHeight && deltY > 0 &&  firstPos == 0) )) {
                     ViewGroup.LayoutParams layoutParams = mHeaderContainer.getLayoutParams();
                     layoutParams.height += deltY;
                     //防止下次收到move事件，getBottom() < mHeaderHeight,导致无法下拉
@@ -108,7 +123,11 @@ public class PullZoomRecyclerView extends RecyclerView {
                     //直接返回true，防止RecyclerView对它进行处理，导致整体上滑
                     return true;
                 }
-                break;
+
+
+                mLastMotionY = Y;
+                return super.onTouchEvent(e);
+
             case MotionEvent.ACTION_UP:
                 mLastMotionY = -1;
                 //自动收起
@@ -118,6 +137,12 @@ public class PullZoomRecyclerView extends RecyclerView {
         return super.onTouchEvent(e);
     }
 
+
+
+    @Override
+    public void onScrolled(int dx, int dy) {
+        super.onScrolled(dx, dy);
+    }
 
     @TargetApi(Build.VERSION_CODES.HONEYCOMB)
     private void endScaling() {
@@ -135,4 +160,11 @@ public class PullZoomRecyclerView extends RecyclerView {
         valueAnimator.start();
     }
 
+}
+
+class LayoutExcaption extends Exception {
+    @Override
+    public String getMessage() {
+            return "必须使用LinearLayoutManager或GridLayoutManager";
+    }
 }
